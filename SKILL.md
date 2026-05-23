@@ -110,6 +110,39 @@ detail URL 对了，不等于页面好了。必须同时验证：
 
 ## 4. 执行顺序
 
+## 4.0 强制执行策略（非常重要）
+
+针对 TCM2 任务，**不要重写提取核心**。这不是建议，是本 skill 的默认执行要求。
+
+### 明确禁止
+- 不要再临时生成新的页面注入 JS 来做“周次选择逻辑”
+- 不要自己定义类似 `todayDate`、`currentWeek`、`latestWeek` 之类的前端变量去推导周
+- 不要重新实现另一套 detail 页检测逻辑
+- 不要重新实现另一套表格提取逻辑
+- 不要只汇报你“推理后的判断”，必须给出实际脚本执行结果
+
+### 明确要求
+TCM2 提取核心必须优先直接调用本 skill 自带脚本：
+1. `scripts/check_tcm2_conflict.ps1`
+2. `scripts/start_chrome_9222.ps1`
+3. `scripts/run_tcm2_class.ps1`
+4. `scripts/tcm2_portable_extract.py`
+
+如果 agent 没有直接调用到 `run_tcm2_class.ps1` 或 `tcm2_portable_extract.py`，那就不算真正遵守了本 skill。
+
+### 失败时的正确行为
+如果脚本执行失败：
+- 先报告原始报错
+- 再最小化修复路径/环境/调用参数问题
+- **不要**绕过这些脚本，自行再写一套新逻辑顶上去
+
+### 输出审计要求
+执行后至少要能说明：
+- 实际执行的命令
+- 是否真的调用了 `run_tcm2_class.ps1`
+- 是否真的调用了 `tcm2_portable_extract.py`
+- 若失败，失败发生在哪一步（冲突检查 / Chrome / cookie / detail 页 / tab / level / 表格读取）
+
 ### 4.1 开始前先做并发占用检查
 优先运行：
 - `scripts/check_tcm2_conflict.ps1`
@@ -138,9 +171,15 @@ detail URL 对了，不等于页面好了。必须同时验证：
 不要依赖 `Network.getCookies`。
 
 ### 4.4 逐班提取
-优先用：
+单班提取必须优先用：
 - `scripts/run_tcm2_class.ps1`
-- 或脚本内层 `tcm2_portable_extract.py`
+- 或在明确说明原因时，直接调用内层 `scripts/tcm2_portable_extract.py`
+
+推荐标准调用：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_tcm2_class.ps1 -ClassName QV848
+```
 
 ### 4.5 五班批量
 如果只需要输出本地文件，可用：
@@ -149,6 +188,7 @@ detail URL 对了，不等于页面好了。必须同时验证：
 如果需要聊天逐班发送：
 - 让 agent 自己循环调用单班脚本
 - 每个班完成就发送
+- 不要把五班先批量跑完再一次性汇总成一条消息
 
 ---
 
